@@ -1,6 +1,7 @@
 /*
- * This example shows how to write a client that subscribes to a topic and does
- * not do anything other than handle the messages that are received.
+ * Program to control up to 16 relays from Pi Zero
+ * Uses mosquitto and wiringPi libraries
+ * MQTT message payload is 2 bytes, channel (1 - 16) and relay state (0 = off, any other value = on)
  */
 
 
@@ -10,6 +11,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <stdint.h>
 
 #include <mosquitto.h>
 #include <wiringPi.h>
@@ -31,7 +33,8 @@ void on_connect(struct mosquitto *mosq, void *obj, int reason_code)
 	 * clients is mosquitto_reason_string().
 	 */
 	printf("on_connect: %s\n", mosquitto_connack_string(reason_code));
-	if(reason_code != 0){
+	if(reason_code != 0)
+	{
 		/* If the connection fails for any reason, we don't want to keep on
 		 * retrying in this example, so disconnect. Without this, the client
 		 * will attempt to reconnect. */
@@ -42,7 +45,8 @@ void on_connect(struct mosquitto *mosq, void *obj, int reason_code)
 	 * connection drops and is automatically resumed by the client, then the
 	 * subscriptions will be recreated when the client reconnects. */
 	rc = mosquitto_subscribe(mosq, NULL, g_Topic, 1);
-	if(rc != MOSQ_ERR_SUCCESS){
+	if(rc != MOSQ_ERR_SUCCESS)
+	{
 		fprintf(stderr, "Error subscribing: %s\n", mosquitto_strerror(rc));
 		/* We might as well disconnect if we were unable to subscribe */
 		mosquitto_disconnect(mosq);
@@ -59,13 +63,15 @@ void on_subscribe(struct mosquitto *mosq, void *obj, int mid, int qos_count, con
 	/* In this example we only subscribe to a single topic at once, but a
 	 * SUBSCRIBE can contain many topics at once, so this is one way to check
 	 * them all. */
-	for(i=0; i<qos_count; i++){
+	for(i=0; i<qos_count; i++)
+	{
 		printf("on_subscribe: %d:granted qos = %d\n", i, granted_qos[i]);
 		if(granted_qos[i] <= 2){
 			have_subscription = true;
 		}
 	}
-	if(have_subscription == false){
+	if(have_subscription == false)
+	{
 		/* The broker rejected all of our subscriptions, we know we only sent
 		 * the one SUBSCRIBE, so there is no point remaining connected. */
 		fprintf(stderr, "Error: All subscriptions rejected.\n");
@@ -79,8 +85,9 @@ void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
 {
 	char *pchar = (char *)msg->payload;
 	int value;
-	unsigned char pin, level;
+	uint8_t *pin, *level;
 
+	// display values received to console
 	for (int i=0; i < msg->payloadlen; i++)
 	{
 		printf("[%d] ", *pchar);
@@ -88,29 +95,41 @@ void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
 	}
 	printf("\n");
 
+
+	// check length of payload
 	if (msg->payloadlen == 2)
 	{
-		pin = *((unsigned char*)&msg->payload[0]);
+		pin = (uint8_t*)msg->payload;
 
-		if (pin > 0 && pin <= 16)
+		// check relay number in range
+		if (*pin > 0 && *pin <= 16)
 		{
 			// use pins 0 - 15
-			pin -= 1;
+			*pin -= 1;
 
-			level = *((unsigned char*)&msg->payload[1]);
-			value = (level == 0) ? HIGH : LOW;
-			digitalWrite(pin, value);
+			// second byte is state
+			level = pin;
+			level++;
+
+			// set GPIO pin
+			value = (*level == 0) ? HIGH : LOW;
+			digitalWrite((int)(*pin), value);
 		}
 	}
-	// printf("%s %d %s\n", msg->topic, msg->qos, (char *)msg->payload);
 }
 
+/*
+ * Display settings to console
+ */
 void displaySettings()
 {
 	printf("TOPIC: %s\n", g_Topic);
 	printf("BROKER: %s\n\n", g_Broker);
 }
 
+/*
+ * Read settings.dat file, set topic and broker
+ */
 bool readSettings()
 {
 	bool result = true;
@@ -119,11 +138,14 @@ bool readSettings()
 	int pos;
 	char *pchar;
 
+	// build full filename path
 	strcpy(filename, g_WorkingDir);
 	strcat(filename, "settings.dat");
 
+	// open file
 	FILE *fp = fopen(filename, "r");
 
+	// set defaults if open fails
 	if (fp == NULL)
 	{
 		printf("Unable to open file: %s, using defaults.\n\n", filename);
@@ -136,8 +158,7 @@ bool readSettings()
 		while (fgets(buffer, BUFFSIZE, fp) != NULL)
 		{
 
-
-			// remove line feed
+			// remove line feed and terminate
 			pos = strlen(buffer) - 1;
 			buffer[pos] = 0;
 
@@ -175,6 +196,9 @@ bool readSettings()
 	return result;
 }
 
+/*
+ * Display program title to console
+ */
 void displayHeader()
 {
 	char buffer[BUFFSIZE];
@@ -195,9 +219,10 @@ void displayHeader()
 	printf("%s\n\n", buffer);
 }
 
-
-
-void parseWorkingDir(char *path)
+/*
+ * Parse working directory from argv[0]
+ */
+void parseWorkingDir(const char *path)
 {
 	char buffer[BUFFSIZE];
 	char* pchar;
@@ -219,7 +244,9 @@ void parseWorkingDir(char *path)
 
 
 /*
- * Setup the
+ * Setup the GPIO pins
+ * Uses wiringPi pins 0-15
+ * All pins initially set high (relays off)
  */
 void gpioSetup()
 {
@@ -240,12 +267,15 @@ int main(int argc, char *argv[])
 	struct mosquitto *mosq;
 	int rc;
 
+	// get current directory to open settings file
 	parseWorkingDir(argv[0]);
 
 	displayHeader();
 
+	// read settings file
 	readSettings();
 
+	// setup GPIO pins
 	gpioSetup();
 
 	/* Required before calling other mosquitto functions */
@@ -257,7 +287,8 @@ int main(int argc, char *argv[])
 	 * obj = NULL -> we aren't passing any of our private data for callbacks
 	 */
 	mosq = mosquitto_new(NULL, true, NULL);
-	if(mosq == NULL){
+	if(mosq == NULL)
+	{
 		fprintf(stderr, "Error: Out of memory.\n");
 		return 1;
 	}
@@ -267,13 +298,13 @@ int main(int argc, char *argv[])
 	mosquitto_subscribe_callback_set(mosq, on_subscribe);
 	mosquitto_message_callback_set(mosq, on_message);
 
-	/* Connect to test.mosquitto.org on port 1883, with a keepalive of 60 seconds.
+	/* Connect to broker on port 1883, with a keepalive of 60 seconds.
 	 * This call makes the socket connection only, it does not complete the MQTT
 	 * CONNECT/CONNACK flow, you should use mosquitto_loop_start() or
 	 * mosquitto_loop_forever() for processing net traffic. */
-	// rc = mosquitto_connect(mosq, "test.mosquitto.org", 1883, 60);
 	rc = mosquitto_connect(mosq, g_Broker, 1883, 60);
-	if(rc != MOSQ_ERR_SUCCESS){
+	if(rc != MOSQ_ERR_SUCCESS)
+	{
 		mosquitto_destroy(mosq);
 		fprintf(stderr, "Error: %s\n", mosquitto_strerror(rc));
 		return 1;
@@ -288,6 +319,7 @@ int main(int argc, char *argv[])
 	mosquitto_loop_forever(mosq, -1, 1);
 
 	mosquitto_lib_cleanup();
+
 	return 0;
 }
 
