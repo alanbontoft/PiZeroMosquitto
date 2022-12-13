@@ -1,7 +1,7 @@
 /*
- * Program to control up to 16 relays from Pi Zero
+ * Program to control up to 24 relays from Pi Zero
  * Uses mosquitto and wiringPi libraries
- * MQTT message payload is 2 bytes, channel (1 - 16) and relay state (0 = off, any other value = on)
+ * MQTT message payload is 2 bytes, channel (1 - 24) and relay state (0 = off, any other value = on)
  */
 
 
@@ -17,11 +17,13 @@
 #include <wiringPi.h>
 
 #define BUFFSIZE 50
+#define MAXRELAY 24
 
 static char g_Topic[BUFFSIZE] = {0};
 static char g_Broker[BUFFSIZE] = {0};
 static char g_WorkingDir[BUFFSIZE] = {0};
 static char g_Title[] = "Pi Zero Relay Controller";
+static uint8_t g_wiringPins[MAXRELAY] = { 8, 9, 7, 21, 22, 11, 10, 13, 12, 14, 26, 23, 15, 16, 27, 0, 1, 24, 28, 29, 3, 4, 5, 6 };  // these are the wiringPi pin numbers that translate to BCM GPIO2 - GPIO25
 
 
 /* Callback called when the client receives a CONNACK message from the broker. */
@@ -84,7 +86,7 @@ void on_subscribe(struct mosquitto *mosq, void *obj, int mid, int qos_count, con
 void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg)
 {
 	char *pchar = (char *)msg->payload;
-	int value;
+	int value, index;
 	uint8_t *pin, *level;
 
 	// display values received to console
@@ -102,10 +104,10 @@ void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
 		pin = (uint8_t*)msg->payload;
 
 		// check relay number in range
-		if (*pin > 0 && *pin <= 16)
+		if (*pin > 0 && *pin <= MAXRELAY)
 		{
-			// use pins 0 - 15
-			*pin -= 1;
+			// use 0 to MAXRELAY - 1
+			index = *pin - 1;
 
 			// second byte is state
 			level = pin;
@@ -113,7 +115,7 @@ void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
 
 			// set GPIO pin
 			value = (*level == 0) ? HIGH : LOW;
-			digitalWrite((int)(*pin), value);
+			digitalWrite(g_wiringPins[index], value);
 		}
 	}
 }
@@ -245,17 +247,17 @@ void parseWorkingDir(const char *path)
 
 /*
  * Setup the GPIO pins
- * Uses wiringPi pins 0-15
+ * Uses GPIO pins 2-25
  * All pins initially set high (relays off)
  */
 void gpioSetup()
 {
 	if (wiringPiSetup() == 0)
 	{
-		for (int i=0; i < 16; i++)
+		for (int i=0; i < MAXRELAY; i++)
 		{
-			pinMode(i, OUTPUT);
-			digitalWrite(i, HIGH);
+			pinMode(g_wiringPins[i], OUTPUT);
+			digitalWrite(g_wiringPins[i], HIGH);
 		}
 	}
 }
