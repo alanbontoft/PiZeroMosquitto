@@ -85,9 +85,9 @@ void on_subscribe(struct mosquitto *mosq, void *obj, int mid, int qos_count, con
 /* Callback called when the client receives a message. */
 void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg)
 {
-	char *pchar = (char *)msg->payload;
+	char *pchar = (char*)msg->payload;
 	int value, index;
-	uint8_t *pin, *level;
+	uint8_t *pbyte;
 
 	// display values received to console
 	for (int i=0; i < msg->payloadlen; i++)
@@ -101,20 +101,20 @@ void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
 	// check length of payload
 	if (msg->payloadlen == 2)
 	{
-		pin = (uint8_t*)msg->payload;
+		// first byte is relay number (1 - MAXRELAY)
+		pbyte = (uint8_t*)msg->payload;
 
 		// check relay number in range
-		if (*pin > 0 && *pin <= MAXRELAY)
+		if (*pbyte > 0 && *pbyte <= MAXRELAY)
 		{
 			// use 0 to MAXRELAY - 1
-			index = *pin - 1;
+			index = *pbyte - 1;
 
 			// second byte is state
-			level = pin;
-			level++;
+			pbyte++;
 
 			// set GPIO pin
-			value = (*level == 0) ? HIGH : LOW;
+			value = (*pbyte == 0) ? HIGH : LOW;
 			digitalWrite(g_wiringPins[index], value);
 		}
 	}
