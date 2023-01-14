@@ -47,6 +47,8 @@
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.cpp.link.option.paths.375865433" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" useByScannerDiscovery="false" valueType="libPaths">
 									<listOptionValue builtIn="false" value="&quot;C:\SysGCC\raspberry\arm-linux-gnueabihf\sysroot\usr\lib&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;C:\SysGCC\raspberry\arm-linux-gnueabihf\sysroot\usr\lib\mosquitto&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;C:\SysGCC\raspberry\arm-linux-gnueabihf\sysroot\usr\lib\wiring&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.37524149" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>

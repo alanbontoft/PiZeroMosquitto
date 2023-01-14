@@ -152,7 +152,7 @@ bool readSettings()
 	{
 		printf("Unable to open file: %s, using defaults.\n\n", filename);
 		strcpy(g_Topic, "relays");
-		strcpy(g_Broker, "192.168.0.1");
+		strcpy(g_Broker, "localhost");
 		result = false;
 	}
 	else
@@ -304,13 +304,21 @@ int main(int argc, char *argv[])
 	 * This call makes the socket connection only, it does not complete the MQTT
 	 * CONNECT/CONNACK flow, you should use mosquitto_loop_start() or
 	 * mosquitto_loop_forever() for processing net traffic. */
-	rc = mosquitto_connect(mosq, g_Broker, 1883, 60);
-	if(rc != MOSQ_ERR_SUCCESS)
+
+	do
 	{
-		mosquitto_destroy(mosq);
-		fprintf(stderr, "Error: %s\n", mosquitto_strerror(rc));
-		return 1;
-	}
+		rc = mosquitto_connect(mosq, g_Broker, 1883, 60);
+
+		if(rc != MOSQ_ERR_SUCCESS)
+		{
+			// show error description
+			fprintf(stderr, "Error: %s\n", mosquitto_strerror(rc));
+
+			// wait 2s before retry
+			delay(2000);
+		}
+
+	} while (rc != MOSQ_ERR_SUCCESS);
 
 	/* Run the network loop in a blocking call. The only thing we do in this
 	 * example is to print incoming messages, so a blocking call here is fine.
