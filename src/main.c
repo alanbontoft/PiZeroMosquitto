@@ -15,6 +15,7 @@
 
 #include <mosquitto.h>
 #include <wiringPi.h>
+#include "cJSON.h"
 
 #define BUFFSIZE 50
 #define MAXRELAY 24
@@ -85,37 +86,35 @@ void on_subscribe(struct mosquitto *mosq, void *obj, int mid, int qos_count, con
 /* Callback called when the client receives a message. */
 void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg)
 {
-	char *pchar = (char*)msg->payload;
+	char *jsonstring = (char*)msg->payload;
 	int value, index;
-	uint8_t *pbyte;
 
-	// display values received to console
-	for (int i=0; i < msg->payloadlen; i++)
+	cJSON *relay = NULL;
+	cJSON *state = NULL;
+
+	// display message received to console
+	printf("%s\n", jsonstring);
+
+	// parse json string
+	cJSON *json = cJSON_Parse(jsonstring);
+
+	if (json != NULL)
 	{
-		printf("[%d] ", *pchar);
-		pchar++;
-	}
-	printf("\n");
+		relay = cJSON_GetObjectItem(json, "relay");
+		state = cJSON_GetObjectItem(json, "state");
 
-
-	// check length of payload
-	if (msg->payloadlen == 2)
-	{
-		// first byte is relay number (1 - MAXRELAY)
-		pbyte = (uint8_t*)msg->payload;
-
-		// check relay number in range
-		if (*pbyte > 0 && *pbyte <= MAXRELAY)
+		if (cJSON_IsNumber(relay) && cJSON_IsNumber(state))
 		{
-			// use 0 to MAXRELAY - 1
-			index = *pbyte - 1;
+			// check relay number in range
+			if (relay->valueint > 0 && relay->valueint <= MAXRELAY)
+			{
+				// use 0 to MAXRELAY - 1
+				index = relay->valueint - 1;
 
-			// second byte is state
-			pbyte++;
-
-			// set GPIO pin
-			value = (*pbyte == 0) ? HIGH : LOW;
-			digitalWrite(g_wiringPins[index], value);
+				// set GPIO pin (outputs are active low)
+				value = (state->valueint == 0) ? HIGH : LOW;
+				digitalWrite(g_wiringPins[index], value);
+			}
 		}
 	}
 }
