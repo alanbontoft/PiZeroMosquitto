@@ -129,6 +129,30 @@ void displaySettings()
 }
 
 /*
+ * trim any whitespace chars from end of string
+ */
+void trimspaces(char* pchar)
+{
+	// store original length
+	int len = strlen(pchar);
+
+	// index of last char
+	int index = len - 1;
+
+	// count of whitespace chars
+	int count = 0;
+
+	// iterate backwards from end until non-whitespace char found
+	while (isspace(pchar[index--]))
+	{
+		count++;
+	}
+
+	// null terminate after last char
+	pchar[len - count] = 0;
+}
+
+/*
  * Read settings.dat file, set topic and broker
  */
 bool readSettings()
@@ -177,12 +201,20 @@ bool readSettings()
 					if (strcmp(pchar, "TOPIC") == 0)
 					{
 						pchar = strtok(NULL, " ");
-						if (pchar != NULL) strcpy(g_Topic, pchar);
+						if (pchar != NULL)
+						{
+							strcpy(g_Topic, pchar);
+							trimspaces(g_Topic);
+						}
 					}
 					else if (strcmp(pchar, "BROKER") == 0)
 					{
 						pchar = strtok(NULL, " ");
-						if (pchar != NULL) strcpy(g_Broker, pchar);
+						if (pchar != NULL)
+						{
+							strcpy(g_Broker, pchar);
+							trimspaces(g_Broker);
+						}
 					}
 				}
 			}
@@ -260,7 +292,6 @@ void gpioSetup()
 		}
 	}
 }
-
 
 
 int main(int argc, char *argv[])
